@@ -13,7 +13,7 @@ function sanitize($data)
 }
 
 // reCAPTCHA secret key
-$recaptcha_secret = '6LemrF8rAAAAAK5VQ5ArGZRIac_OE7wXIl7Nqx_y';
+$recaptcha_secret = '6Ld6p2IrAAAAAN7lzFbjlT81KgiPyz2cN0xdg8-5';
 $recaptcha_response = $_POST['g-recaptcha-response'] ?? '';
 
 if (empty($recaptcha_response)) {
