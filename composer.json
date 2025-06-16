@@ -1,5 +1,29 @@
 {
+  "name": "adammz02/pulse-web-security",
+  "description": "Pulse Web Security - PHP web app using SQLite for DigitalOcean App Platform.",
+  "type": "project",
+  "license": "MIT",
   "require": {
-    "ext-sqlite3": "*"
-  }
+    "php": ">=8.0",
+    "ext-sqlite3": "*",
+    "ext-pdo_sqlite": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Pulse\\": "src/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
+  },
+  "config": {
+    "platform": {
+      "php": "8.2"
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
 }
