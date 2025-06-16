@@ -1,10 +1,8 @@
 <?php
 session_start();
 
-$conn = new mysqli("localhost", "root", "", "pulse_db");
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+$dbFile = __DIR__ . '/pulse_db.sqlite';
+$conn = new SQLite3($dbFile);
 
 function sanitize($data)
 {
@@ -29,14 +27,12 @@ if (!preg_match("/^[a-zA-Z\s'-]+$/", $full_name)) {
     exit;
 }
 
-// Validate NRIC format: XXXXXX-XX-XXXX
 if (!preg_match('/^\d{6}-\d{2}-\d{4}$/', $nric)) {
     $_SESSION['error'] = "Invalid NRIC format. Use XXXXXX-XX-XXXX.";
     header("Location: signup.php");
     exit;
 }
 
-// Validate student ID format: DIXXXXXX and must be DI21XXXX or above
 if (!preg_match('/^DI\d{6}$/', $student_id)) {
     $_SESSION['error'] = "Invalid ID format. Use DI followed by 6 digits.";
     header("Location: signup.php");
@@ -49,7 +45,6 @@ if ($year_enrolled <= 20) {
     exit;
 }
 
-// Validate password strength
 if (
     strlen($password) < 8 ||
     !preg_match('/[A-Z]/', $password) ||
@@ -68,7 +63,6 @@ if (
     exit;
 }
 
-// Validate email
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $_SESSION['error'] = "Invalid email format.";
     header("Location: signup.php");
@@ -76,25 +70,26 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 }
 
 // Check for duplicates
-// Check for duplicates
-$check = $conn->prepare("SELECT * FROM users WHERE email = ? OR student_id = ? OR nric = ?");
-$check->bind_param("sss", $email, $student_id, $nric);
-$check->execute();
-$result = $check->get_result();
-if ($result->num_rows > 0) {
+$check = $conn->prepare("SELECT * FROM users WHERE email = :email OR student_id = :student_id OR nric = :nric");
+$check->bindValue(':email', $email, SQLITE3_TEXT);
+$check->bindValue(':student_id', $student_id, SQLITE3_TEXT);
+$check->bindValue(':nric', $nric, SQLITE3_TEXT);
+$result = $check->execute();
+
+if ($result->fetchArray(SQLITE3_ASSOC)) {
     $_SESSION['error'] = "An account with the provided information already exists";
-    // DO NOT set $_SESSION['form_values'] here — clears the fields
     header("Location: signup.php");
     exit;
 }
 
-
-// Hash password
 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-// Insert into DB
-$stmt = $conn->prepare("INSERT INTO users (full_name, nric, student_id, email, password) VALUES (?, ?, ?, ?, ?)");
-$stmt->bind_param("sssss", $full_name, $nric, $student_id, $email, $hashed_password);
+$stmt = $conn->prepare("INSERT INTO users (full_name, nric, student_id, email, password) VALUES (:full_name, :nric, :student_id, :email, :password)");
+$stmt->bindValue(':full_name', $full_name, SQLITE3_TEXT);
+$stmt->bindValue(':nric', $nric, SQLITE3_TEXT);
+$stmt->bindValue(':student_id', $student_id, SQLITE3_TEXT);
+$stmt->bindValue(':email', $email, SQLITE3_TEXT);
+$stmt->bindValue(':password', $hashed_password, SQLITE3_TEXT);
 
 if ($stmt->execute()) {
     $_SESSION['success'] = "Account created successfully. Please log in.";
@@ -105,3 +100,4 @@ if ($stmt->execute()) {
     header("Location: signup.php");
     exit;
 }
+?>
