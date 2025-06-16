@@ -44,7 +44,7 @@
             <input type="text" name="id" placeholder="ID Number (Matric Number)" required>
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit">Log In</button>
-            <div class="g-recaptcha" data-sitekey="6LemrF8rAAAAAG4iGcvf7VlUB5LSOcmHHEfWKp2s"></div>
+            <div class="g-recaptcha" data-sitekey="6Ld6p2IrAAAAAB7ZwaHPeDh2Lie8kc-RGEb-nUjp"></div>
 
         </form>
         <a href="#" class="forgot-password">Forgot password?</a>
