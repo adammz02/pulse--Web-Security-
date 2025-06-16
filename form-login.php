@@ -2,11 +2,9 @@
 session_start();
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
-// Database connection
-$conn = new mysqli("localhost", "root", "", "pulse_db");
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+// Database connection (SQLite)
+$dbFile = __DIR__ . '/pulse_db.sqlite';
+$conn = new SQLite3($dbFile);
 
 // Helper function
 function sanitize($data)
@@ -18,14 +16,12 @@ function sanitize($data)
 $recaptcha_secret = '6LemrF8rAAAAAK5VQ5ArGZRIac_OE7wXIl7Nqx_y';
 $recaptcha_response = $_POST['g-recaptcha-response'] ?? '';
 
-// Check if CAPTCHA is completed
 if (empty($recaptcha_response)) {
     $_SESSION['error'] = "Please complete the CAPTCHA.";
     header("Location: login.php");
     exit;
 }
 
-// Verify CAPTCHA with Google
 $verify = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$recaptcha_secret}&response={$recaptcha_response}");
 $captcha = json_decode($verify);
 
@@ -35,38 +31,32 @@ if (!$captcha->success) {
     exit;
 }
 
-// Process login
 $student_id = strtoupper(sanitize($_POST['id']));
 $password = $_POST['password'];
 
-// Validate student ID format
 if (!preg_match('/^DI\d{6}$/', $student_id) || intval(substr($student_id, 2, 2)) <= 20) {
     $_SESSION['error'] = "Invalid credentials. Try again.";
     header("Location: login.php");
     exit;
 }
 
-// Query user
-$stmt = $conn->prepare("SELECT * FROM users WHERE student_id = ?");
-$stmt->bind_param("s", $student_id);
-$stmt->execute();
-$result = $stmt->get_result();
+$stmt = $conn->prepare("SELECT * FROM users WHERE student_id = :student_id");
+$stmt->bindValue(':student_id', $student_id, SQLITE3_TEXT);
+$result = $stmt->execute();
 
-if ($result->num_rows === 1) {
-    $user = $result->fetch_assoc();
+$user = $result->fetchArray(SQLITE3_ASSOC);
 
-    // Check for account lock
+if ($user) {
     if ($user['locked_until'] && strtotime($user['locked_until']) > time()) {
         $_SESSION['error'] = "Account locked. Please try again at " . date("H:i", strtotime($user['locked_until'])) . " Malaysia Time (GMT+8).";
         header("Location: login.php");
         exit;
     }
 
-    // Verify password
     if (password_verify($password, $user['password'])) {
-        // Success: reset login attempts and lock
-        $reset = $conn->prepare("UPDATE users SET login_attempts = 0, locked_until = NULL WHERE user_id = ?");
-        $reset->bind_param("i", $user['user_id']);
+        // Reset login attempts and lockout
+        $reset = $conn->prepare("UPDATE users SET login_attempts = 0, locked_until = NULL WHERE user_id = :user_id");
+        $reset->bindValue(':user_id', $user['user_id'], SQLITE3_INTEGER);
         $reset->execute();
 
         $_SESSION['user_id'] = $user['user_id'];
@@ -74,16 +64,18 @@ if ($result->num_rows === 1) {
         header("Location: index.php");
         exit;
     } else {
-        // Wrong password: update login attempts
         $attempts = $user['login_attempts'] + 1;
         if ($attempts >= 3) {
             $lockout_time = date("Y-m-d H:i:s", strtotime("+5 minutes"));
-            $update = $conn->prepare("UPDATE users SET login_attempts = ?, locked_until = ? WHERE user_id = ?");
-            $update->bind_param("isi", $attempts, $lockout_time, $user['user_id']);
+            $update = $conn->prepare("UPDATE users SET login_attempts = :attempts, locked_until = :locked_until WHERE user_id = :user_id");
+            $update->bindValue(':attempts', $attempts, SQLITE3_INTEGER);
+            $update->bindValue(':locked_until', $lockout_time, SQLITE3_TEXT);
+            $update->bindValue(':user_id', $user['user_id'], SQLITE3_INTEGER);
             $_SESSION['error'] = "Account locked due to multiple failed attempts. Try again in 5 minutes.";
         } else {
-            $update = $conn->prepare("UPDATE users SET login_attempts = ? WHERE user_id = ?");
-            $update->bind_param("ii", $attempts, $user['user_id']);
+            $update = $conn->prepare("UPDATE users SET login_attempts = :attempts WHERE user_id = :user_id");
+            $update->bindValue(':attempts', $attempts, SQLITE3_INTEGER);
+            $update->bindValue(':user_id', $user['user_id'], SQLITE3_INTEGER);
             $_SESSION['error'] = "Invalid ID or password.";
         }
         $update->execute();
